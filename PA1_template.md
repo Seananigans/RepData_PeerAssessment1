@@ -7,7 +7,8 @@ January 17, 2015
 1. Load the data using `read.csv` function.
 
 ```r
-data <- read.csv("activity.csv", colClasses = c("integer","Date","factor"))
+data <- read.csv("activity.csv", 
+                 colClasses = c("integer","Date","numeric"))
 ```
 2. Process/transform the data into an `NA` free format suitable for analysis.
 
@@ -20,9 +21,14 @@ data.Rna <- na.omit(data)
 
 
 ```r
-dailySteps <- aggregate(data.Rna$steps,by = list(data.Rna$date), FUN=sum)
+dailySteps <- aggregate(steps ~ date, 
+                        data = data.Rna, 
+                        FUN = sum)
 names(dailySteps) <- c("date","steps")
-barplot(dailySteps$steps, names.arg = dailySteps$date, xlab = "date", ylab = "steps")
+barplot(dailySteps$steps, 
+        names.arg = dailySteps$date, 
+        main = "Total Steps taken Daily",
+        xlab = "date", ylab = "steps")
 ```
 
 ![](./PA1_template_files/figure-html/unnamed-chunk-3-1.png) 
@@ -48,16 +54,36 @@ median(dailySteps$steps)
 
 ## What is the average daily activity pattern?
 1. Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```r
+intervalSteps <- aggregate(steps~interval, 
+                           data = data.Rna, 
+                           FUN = mean)
+names(intervalSteps)<-c("interval","steps")
+plot(type = "l", intervalSteps, 
+     main = "Average Steps per Time Interval",
+     xlab = "Interval in Minutes", ylab = "Steps")
+```
+
 ![](./PA1_template_files/figure-html/unnamed-chunk-5-1.png) 
-2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of average steps?
+
+```r
+intervalSteps[intervalSteps$steps == max(intervalSteps$steps),]
+```
 
 ```
-## [1] 835
+##     interval    steps
+## 104      835 206.1698
 ```
 
 
 ## Imputing missing values
 1. Total number of missing values in the dataset
+
+```r
+sum(is.na(data))
+```
 
 ```
 ## [1] 2304
@@ -68,11 +94,23 @@ median(dailySteps$steps)
         
         + Create a new dataset that is equal to the original dataset but with the missing data filled in.
 
+```r
+data.intMean <- merge(data, intervalSteps, 
+                      by = "interval", 
+                      suffixes = c("", ".intMean"))
+NAs <- is.na(data.intMean$steps)
+data.intMean$steps[NAs] <- data.intMean$steps.intMean[NAs]
+data.intMean <- data.intMean[, c(1:3)]
+```
         + Plot a histogram of the total number of steps taken daily. 
 
 ```r
-dailySteps2 <- aggregate(steps ~ date, data.intMean, sum)
-barplot(dailySteps2$steps, names.arg = dailySteps2$date, xlab = "date", ylab = "steps")
+dailySteps2 <- aggregate(steps ~ date, 
+                         data = data.intMean, 
+                         FUN = sum)
+barplot(dailySteps2$steps, names.arg = dailySteps2$date,
+        main = "Total Steps taken Daily with Means as NAs",
+        xlab = "date", ylab = "steps")
 ```
 
 ![](./PA1_template_files/figure-html/unnamed-chunk-9-1.png) 
@@ -115,17 +153,25 @@ median(dailySteps2$steps) - median(dailySteps$steps)
 
 1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend”.
 
+```r
+day <- function(date) {
+    ifelse (weekdays(as.Date(date)) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+}
+data.intMean$day <- as.factor(sapply(data.intMean$date, day))
+table(data.intMean$day)
+```
+
 ```
 ## 
 ## weekday weekend 
 ##   12960    4608
 ```
-2. Panel plot a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+2. Panel plot a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekdays or weekend days (y-axis).
 
 ```r
 par(mfrow = c(2, 1))
 for (type in c("weekend", "weekday")) {
-    dayType <- aggregate(steps ~ as.numeric(as.character(interval)), 
+    dayType <- aggregate(steps ~ interval, 
                             data = data.intMean, 
                             subset = data.intMean$day == type, 
                             FUN = mean)
