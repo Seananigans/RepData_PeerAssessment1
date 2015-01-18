@@ -66,6 +66,7 @@ plot(type = "l", intervalSteps,
 ```
 
 ![](./PA1_template_files/figure-html/unnamed-chunk-5-1.png) 
+
 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of average steps?
 
 ```r
@@ -88,6 +89,7 @@ sum(is.na(data))
 ```
 ## [1] 2304
 ```
+
 2. Devise/Create/Plot/Calculate
 
         + Devise a strategy for filling in all of the missing values in the dataset with the interval mean. 
@@ -102,6 +104,7 @@ NAs <- is.na(data.intMean$steps)
 data.intMean$steps[NAs] <- data.intMean$steps.intMean[NAs]
 data.intMean <- data.intMean[, c(1:3)]
 ```
+
         + Plot a histogram of the total number of steps taken daily. 
 
 ```r
@@ -114,6 +117,7 @@ barplot(dailySteps2$steps, names.arg = dailySteps2$date,
 ```
 
 ![](./PA1_template_files/figure-html/unnamed-chunk-9-1.png) 
+
         + Calculate the mean and median total number of steps taken daily.
 
 ```r
@@ -131,6 +135,7 @@ median(dailySteps2$steps)
 ```
 ## [1] 10766.19
 ```
+
 3. Replacing `NA` values with the mean interval values allows the median to match the mean. This was not the case in the original `data`. Imputing `NA` data changes the descriptive statistics.
 
 ```r
@@ -166,6 +171,7 @@ table(data.intMean$day)
 ## weekday weekend 
 ##   12960    4608
 ```
+
 2. Panel plot a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekdays or weekend days (y-axis).
 
 ```r
