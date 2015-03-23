@@ -1,42 +1,111 @@
-# Reproducible Research: Peer Assessment 1
-Sean Hegarty  
-January 17, 2015  
+---
+title: "Project 1:Activity Monitoring"
+author: "Sean Hegarty"
+date: "Wednesday, March 11, 2015"
+output: html_document
+---
 
 
-## Loading and preprocessing the data
-1. Load the data using `read.csv` function.
-
-```r
-data <- read.csv("activity.csv", 
-                 colClasses = c("integer","Date","numeric"))
-```
-2. Process/transform the data into an `NA` free format suitable for analysis.
-
-```r
-data.Rna <- na.omit(data)
-```
-
-## What is mean total number of steps taken per day?
-1. Make a histogram of the total number of steps taken each day
 
 
 ```r
-dailySteps <- aggregate(steps ~ date, 
-                        data = data.Rna, 
-                        FUN = sum)
-names(dailySteps) <- c("date","steps")
-barplot(dailySteps$steps, 
-        names.arg = dailySteps$date, 
-        main = "Total Steps taken Daily",
-        xlab = "date", ylab = "steps")
+#Project 1 Directory Setup
+ProjectDir<- getwd()
+if (ProjectDir!="~/Desktop/DataScience/RepResearch/Project1"){
+  print("Changing Directory")
+  setwd("~/Desktop/DataScience/RepResearch/Project1")
+  ProjectDir<- getwd()
+}
 ```
 
-![](./PA1_template_files/figure-html/unnamed-chunk-3-1.png) 
-
-2. Calculate and report the mean and median total number of steps taken per day
+```
+## [1] "Changing Directory"
+```
 
 ```r
-mean(dailySteps$steps)
+#File Download
+if(!"activity.csv" %in% dir("data")){
+  print("Downloading Activity Data")
+  fileURL<- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+  download.file(fileURL, destfile = "data/repdata-data-activity.zip",
+                method="curl")
+  unzip("data/repdata-data-activity.zip",exdir="data", files="activity.csv")
+}
+
+#Libraries and Settings
+library(ggplot2)
+library(scales)
+library(plyr)
+echo=TRUE
+
+#Data Processing
+if(!"activity" %in% ls()){
+  print("Importing Activity Data into Environment")
+  activity <- read.csv("data/activity.csv",colClasses=c("integer","Date","factor"))
+}
+```
+
+```
+## [1] "Importing Activity Data into Environment"
+```
+
+###What is the mean total number of steps taken per day?
+
+```r
+#Exploratore Data Frame
+dim(activity)
+```
+
+```
+## [1] 17568     3
+```
+
+```r
+head(activity)
+```
+
+```
+##   steps       date interval
+## 1    NA 2012-10-01        0
+## 2    NA 2012-10-01        5
+## 3    NA 2012-10-01       10
+## 4    NA 2012-10-01       15
+## 5    NA 2012-10-01       20
+## 6    NA 2012-10-01       25
+```
+
+```r
+sapply(activity,class)
+```
+
+```
+##     steps      date  interval 
+## "integer"    "Date"  "factor"
+```
+
+```r
+naFree <- na.omit(activity)
+activity$interval <- as.integer(as.character(activity$interval))
+
+#Explore daily Central Tendency
+dailySteps <- ddply(naFree,c("date"),summarise,tot=sum(steps))
+```
+
+```r
+DailyStepsHist <- qplot(data=dailySteps,tot,
+                        geom="histogram",
+                        main="Daily Steps w/ Non-Imputed Activity Data",
+                        binwidth=dim(activity)[1]/30)
+DailyStepsHist
+```
+
+![plot of chunk unnamed-chunk-3](figure/unnamed-chunk-3-1.png) 
+
+As we can see below, the median and the mean lie very close to each other. A difference of only 1.19 steps.
+
+
+```r
+mean(dailySteps$tot)
 ```
 
 ```
@@ -44,84 +113,87 @@ mean(dailySteps$steps)
 ```
 
 ```r
-median(dailySteps$steps)
+median(dailySteps$tot)
 ```
 
 ```
 ## [1] 10765
 ```
 
-
-## What is the average daily activity pattern?
-1. Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+###What is the average daily activity pattern?
 
 ```r
-intervalSteps <- aggregate(steps~interval, 
-                           data = data.Rna, 
-                           FUN = mean)
-names(intervalSteps)<-c("interval","steps")
-plot(type = "l", intervalSteps, 
-     main = "Average Steps per Time Interval",
-     xlab = "Interval in Minutes", ylab = "Steps")
+#Explore 5 minute interval means
+intervalSteps <- ddply(naFree,c("interval"),summarise,mn=mean(steps))
+intervalSteps$interval <- as.integer(as.character(intervalSteps$interval))
+intervalSteps <- arrange(intervalSteps,interval)
 ```
-
-![](./PA1_template_files/figure-html/unnamed-chunk-5-1.png) 
-
-2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of average steps?
 
 ```r
-intervalSteps[intervalSteps$steps == max(intervalSteps$steps),]
+IntMeansPlot<-qplot(data=intervalSteps,y=mn,x=interval,
+                    geom="line",
+                    main="Average Steps per 5-minute Interval")
+IntMeansPlot
 ```
 
-```
-##     interval    steps
-## 104      835 206.1698
-```
+![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6-1.png) 
 
+Below, the interval with the highest average steps is shown. The statistic says that the highest average number of steps are taken in the 5 minute interval between 8:35am and 8:40am. That maximum is 206.1698. I would speculate this is because everyone is running late for work.
 
-## Imputing missing values
-1. Total number of missing values in the dataset
 
 ```r
-sum(is.na(data))
+#Maximum Step interval
+head(arrange(intervalSteps,desc(mn)),1)
+```
+
+```
+##   interval       mn
+## 1      835 206.1698
+```
+
+###Imputing missing data
+In order to generate a complete dataset, I have imputed the NA values with their particular 5 minute interval mean.
+
+
+```r
+#Impute Missing Data with Interval Means
+naData <- activity[is.na(activity$steps),]
+dim(naData)[1]
 ```
 
 ```
 ## [1] 2304
 ```
 
-2. Devise/Create/Plot/Calculate
-
-        + Devise a strategy for filling in all of the missing values in the dataset with the interval mean. 
-        
-        + Create a new dataset that is equal to the original dataset but with the missing data filled in.
-
 ```r
-data.intMean <- merge(data, intervalSteps, 
-                      by = "interval", 
-                      suffixes = c("", ".intMean"))
-NAs <- is.na(data.intMean$steps)
-data.intMean$steps[NAs] <- data.intMean$steps.intMean[NAs]
-data.intMean <- data.intMean[, c(1:3)]
+for (i in 1:nrow(naData)){
+  naData$steps[i] <- intervalSteps[intervalSteps$interval==naData$interval[i],]$mn
+}
+naData$rNames<-as.integer(row.names(naData))
+temp <- activity
+for (i in naData$rNames){
+  temp$steps[i] <- naData[naData$rNames==i,]$steps
+}
+
+#Explore daily Central Tendency after Imputing missing Values
+ImpDailySteps <- ddply(temp,c("date"),summarise,tot=sum(steps))
 ```
 
-        + Plot a histogram of the total number of steps taken daily. 
-
 ```r
-dailySteps2 <- aggregate(steps ~ date, 
-                         data = data.intMean, 
-                         FUN = sum)
-barplot(dailySteps2$steps, names.arg = dailySteps2$date,
-        main = "Total Steps taken Daily with Means as NAs",
-        xlab = "date", ylab = "steps")
+ImpDailyStepHist <- qplot(data=ImpDailySteps,tot,
+                          geom="histogram",
+                          main="Daily Steps w/ Imputed Activity Data",
+                          binwidth=dim(activity)[1]/30)
+ImpDailyStepHist
 ```
 
-![](./PA1_template_files/figure-html/unnamed-chunk-9-1.png) 
+![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png) 
 
-        + Calculate the mean and median total number of steps taken daily.
+By comparison between the dataset with NA values removed and the imputed dataset, the means and medians are almost exactly the same. However, in the imputed dataset, the median is able to equal a non-integer value, when in reality a person cannot take 0.19 of a step.
+
 
 ```r
-mean(dailySteps2$steps)
+mean(ImpDailySteps$tot)
 ```
 
 ```
@@ -129,61 +201,82 @@ mean(dailySteps2$steps)
 ```
 
 ```r
-median(dailySteps2$steps)
+median(ImpDailySteps$tot)
 ```
 
 ```
 ## [1] 10766.19
 ```
 
-3. Replacing `NA` values with the mean interval values allows the median to match the mean. This was not the case in the original `data`. Imputing `NA` data changes the descriptive statistics.
+```r
+#Compare Imputed and NA-free Datasets
+imputed <- c(mean(ImpDailySteps$tot),median(ImpDailySteps$tot))
+nonimputed <- c(mean(dailySteps$tot),median(dailySteps$tot))
+ImpVnon <- data.frame(rbind(imputed,nonimputed))
+names(ImpVnon)<-c("Mean","Median")
+ImpVnon
+```
+
+```
+##                Mean   Median
+## imputed    10766.19 10766.19
+## nonimputed 10766.19 10765.00
+```
+
+###Are there differences in activity patterns between weekdays and weekends?
 
 ```r
-mean(dailySteps2$steps) - mean(dailySteps$steps)
+#Weekdays vs Weekends
+temp$dayName <- weekdays(activity$date)
+
+weekend<-c("Saturday","Sunday")
+for (i in 1:nrow(temp)){if (temp$dayName[i] %in% weekend){temp$weekend[i]<-"Weekend"}
+                        else{temp$weekend[i]<-"Weekday"}}
+temp$weekend<-as.factor(temp$weekend)
+
+#Explore 5 minute interval means for Weekdays VS Weekends
+endIntSteps <- aggregate(temp$steps,
+                         list(interval=as.integer(as.character(temp$interval)),
+                              weekday=temp$weekend),
+                         FUN="mean")
+endIntSteps <- arrange(endIntSteps,interval)
+names(endIntSteps)[3]<-"AverageSteps"
 ```
 
+It would appear from the graph below that people are less active during the early morning hours but are more consistently active throughout the day during the weekend.My earlier speculation about the morning work rush still holds.
+
+
+```r
+IntMnsEnd <- qplot(data=endIntSteps,y=AverageSteps,x=interval,
+                   geom="line",facets=weekday~.,
+                   main="Average Steps per 5-minute Interval")
+IntMnsEnd 
 ```
-## [1] 0
+
+![plot of chunk unnamed-chunk-12](figure/unnamed-chunk-12-1.png) 
+
+###Every Day Comparison
+As an added bonus, I thought it would be interesting to compare every day of the week in the dataset and graphs below.
+
+
+```r
+#Explore 5 minute interval means for every weekday
+dayIntSteps <- aggregate(temp$steps,
+                         list(interval=as.integer(as.character(temp$interval)),
+                              dayName=factor(temp$dayName)),
+                         FUN="mean")
+dayIntSteps <- arrange(dayIntSteps,interval)
+names(dayIntSteps)[3] <-"AverageSteps"
 ```
 
 ```r
-median(dailySteps2$steps) - median(dailySteps$steps)
+IntMnsDays <- qplot(data=dayIntSteps,y=AverageSteps,x=interval,
+                    geom="line",facets=dayName~.,
+                    main="Average Steps per 5-minute Interval")
+IntMnsDays
 ```
 
-```
-## [1] 1.188679
-```
+![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png) 
 
-## Are there differences in activity patterns between weekdays and weekends?
 
-1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend”.
 
-```r
-day <- function(date) {
-    ifelse (weekdays(as.Date(date)) %in% c("Saturday", "Sunday"), "weekend", "weekday")
-}
-data.intMean$day <- as.factor(sapply(data.intMean$date, day))
-table(data.intMean$day)
-```
-
-```
-## 
-## weekday weekend 
-##   12960    4608
-```
-
-2. Panel plot a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekdays or weekend days (y-axis).
-
-```r
-par(mfrow = c(2, 1))
-for (type in c("weekend", "weekday")) {
-    dayType <- aggregate(steps ~ interval, 
-                            data = data.intMean, 
-                            subset = data.intMean$day == type, 
-                            FUN = mean)
-    plot(dayType, type = "l", main = type, 
-         xlab = "Interval in Minutes", ylab = "Steps")
-}
-```
-
-![](./PA1_template_files/figure-html/unnamed-chunk-13-1.png) 
